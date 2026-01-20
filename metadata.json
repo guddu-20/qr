@@ -1,0 +1,7 @@
+{
+  "name": "EventGuard Pro",
+  "description": "High-scale event attendance system with QR scanning, dual-day tracking, and Google Sheets CSV import.",
+  "requestFramePermissions": [
+    "camera"
+  ]
+}
