@@ -61,17 +61,28 @@ const Registry: React.FC<RegistryProps> = ({ guests, onDeleteGuest }) => {
   const [selectedGuest, setSelectedGuest] = useState<Guest | null>(null);
   const [isZipping, setIsZipping] = useState(false);
   const [zipProgress, setZipProgress] = useState(0);
+  const [isSendingEmails, setIsSendingEmails] = useState(false);
+
+  /* ================= UNIQUE GUESTS ================= */
+  const uniqueGuests = useMemo(() => {
+    const seen = new Set<string>();
+    return guests.filter(guest => {
+      if (seen.has(guest.email)) return false;
+      seen.add(guest.email);
+      return true;
+    });
+  }, [guests]);
 
   /* ================= SEARCH ================= */
   const filteredGuests = useMemo(() => {
     const lower = searchTerm.toLowerCase();
-    return guests.filter(
+    return uniqueGuests.filter(
       (g) =>
         g.name.toLowerCase().includes(lower) ||
         g.email.toLowerCase().includes(lower) ||
         String(g.id).includes(lower)
     );
-  }, [guests, searchTerm]);
+  }, [uniqueGuests, searchTerm]);
 
   /* ================= SINGLE QR DOWNLOAD ================= */
   const downloadQR = (id: string, name: string) => {
@@ -100,8 +111,8 @@ const Registry: React.FC<RegistryProps> = ({ guests, onDeleteGuest }) => {
 
   /* ================= BULK ZIP DOWNLOAD ================= */
   const handleBulkDownload = async () => {
-    if (guests.length === 0) return;
-    if (!window.confirm(`Download QR codes for ${guests.length} guests?`))
+    if (uniqueGuests.length === 0) return;
+    if (!window.confirm(`Download QR codes for ${uniqueGuests.length} guests?`))
       return;
 
     setIsZipping(true);
@@ -112,7 +123,7 @@ const Registry: React.FC<RegistryProps> = ({ guests, onDeleteGuest }) => {
       const folder = zip.folder("Event_QRCodes");
 
       let processed = 0;
-      for (const guest of guests) {
+      for (const guest of uniqueGuests) {
         const dataUrl = await QRCode.toDataURL(String(guest.id), {
           width: 400,
           margin: 2,
@@ -151,6 +162,29 @@ const Registry: React.FC<RegistryProps> = ({ guests, onDeleteGuest }) => {
     );
   };
 
+  /* ================= SEND EMAILS TO ALL ================= */
+  const handleSendEmailsToAll = async () => {
+    if (uniqueGuests.length === 0) return;
+    if (!window.confirm(`Send emails to ${uniqueGuests.length} guests?`)) return;
+
+    setIsSendingEmails(true);
+
+    try {
+      for (const guest of uniqueGuests) {
+        const qrImageUrl = `https://api.qrserver.com/v1/create-qr-code/?data=${guest.id}&size=200x200`;
+        sendToSheet(guest.name, guest.email, guest.id, qrImageUrl);
+        // Small delay to avoid overwhelming the server
+        await new Promise(resolve => setTimeout(resolve, 100));
+      }
+      alert("Emails sent to all guests.");
+    } catch (err) {
+      console.error(err);
+      alert("Failed to send emails.");
+    } finally {
+      setIsSendingEmails(false);
+    }
+  };
+
   /* ================= UI ================= */
   return (
     <div className="flex h-full relative">
@@ -162,7 +196,7 @@ const Registry: React.FC<RegistryProps> = ({ guests, onDeleteGuest }) => {
       >
         <div className="p-4 border-b">
           <h2 className="text-xl font-bold mb-3">
-            Registry ({guests.length})
+            Registry ({uniqueGuests.length})
           </h2>
           <div className="relative">
             <Search className="absolute left-3 top-3 text-slate-400" size={18} />
@@ -194,22 +228,41 @@ const Registry: React.FC<RegistryProps> = ({ guests, onDeleteGuest }) => {
           )}
         </div>
 
-        <button
-          onClick={handleBulkDownload}
-          disabled={isZipping}
-          className="m-4 bg-black text-white p-3 rounded flex items-center justify-center gap-2"
-        >
-          {isZipping ? (
-            <>
-              <Loader2 className="animate-spin" />
-              {Math.round((zipProgress / guests.length) * 100)}%
-            </>
-          ) : (
-            <>
-              <Archive /> Download All
-            </>
-          )}
-        </button>
+        <div className="p-4 space-y-2">
+          <button
+            onClick={handleBulkDownload}
+            disabled={isZipping}
+            className="w-full bg-black text-white p-3 rounded flex items-center justify-center gap-2"
+          >
+            {isZipping ? (
+              <>
+                <Loader2 className="animate-spin" />
+                {Math.round((zipProgress / guests.length) * 100)}%
+              </>
+            ) : (
+              <>
+                <Archive /> Download All
+              </>
+            )}
+          </button>
+
+          <button
+            onClick={handleSendEmailsToAll}
+            disabled={isSendingEmails}
+            className="w-full bg-blue-600 text-white p-3 rounded flex items-center justify-center gap-2"
+          >
+            {isSendingEmails ? (
+              <>
+                <Loader2 className="animate-spin" />
+                Sending...
+              </>
+            ) : (
+              <>
+                <Mail /> Send Mails to All
+              </>
+            )}
+          </button>
+        </div>
       </div>
 
       {/* RIGHT PANEL */}
