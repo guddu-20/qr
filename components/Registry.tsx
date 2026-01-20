@@ -14,11 +14,15 @@ import {
 } from "lucide-react";
 import { Guest } from "../types";
 
-/* ================== APPS SCRIPT URL ================== */
+/* ======================================================
+   GOOGLE APPS SCRIPT WEB APP URL (YOUR URL)
+====================================================== */
 const SCRIPT_URL =
-  "https://script.google.com/macros/s/AKfycbx_JR52ymS_jj9OPbXh_LjCaACEx47fY752nmd6uoLlM0P9jS9ldc2pWqUkEh8rnICn/exec";
+  "https://script.google.com/macros/s/AKfycbyd_S2FfENOkyqJnDB5OeKPLfZ0UiEOnBdaxXgf74ACoqkBTQjdILfoFdJX5y7fBbkL/exec";
 
-/* ================== SEND DATA TO GOOGLE SHEET ================== */
+/* ======================================================
+   SEND DATA TO GOOGLE SHEET
+====================================================== */
 function sendToSheet(
   name: string,
   email: string,
@@ -31,33 +35,34 @@ function sendToSheet(
   formData.append("qrId", qrId);
   formData.append("qrImageUrl", qrImageUrl);
 
+  // IMPORTANT: no-cors for Codespaces / Vercel
   fetch(SCRIPT_URL, {
     method: "POST",
+    mode: "no-cors",
     body: formData,
-  })
-    .then(() => {
-      alert("QR details sent. Email will be sent automatically.");
-    })
-    .catch((err) => {
-      console.error(err);
-      alert("Failed to send data to server");
-    });
+  });
+
+  alert("QR details sent. Email will be sent automatically.");
 }
 
-/* ================== PROPS ================== */
+/* ======================================================
+   PROPS
+====================================================== */
 interface RegistryProps {
   guests: Guest[];
   onDeleteGuest: (id: string) => void;
 }
 
-/* ================== COMPONENT ================== */
+/* ======================================================
+   COMPONENT
+====================================================== */
 const Registry: React.FC<RegistryProps> = ({ guests, onDeleteGuest }) => {
   const [searchTerm, setSearchTerm] = useState("");
   const [selectedGuest, setSelectedGuest] = useState<Guest | null>(null);
   const [isZipping, setIsZipping] = useState(false);
   const [zipProgress, setZipProgress] = useState(0);
 
-  /* ================== SEARCH ================== */
+  /* ================= SEARCH ================= */
   const filteredGuests = useMemo(() => {
     const lower = searchTerm.toLowerCase();
     return guests.filter(
@@ -68,7 +73,7 @@ const Registry: React.FC<RegistryProps> = ({ guests, onDeleteGuest }) => {
     );
   }, [guests, searchTerm]);
 
-  /* ================== SINGLE QR DOWNLOAD ================== */
+  /* ================= SINGLE QR DOWNLOAD ================= */
   const downloadQR = (id: string, name: string) => {
     const svg = document.getElementById(`qr-${id}`);
     if (!svg) return;
@@ -93,10 +98,9 @@ const Registry: React.FC<RegistryProps> = ({ guests, onDeleteGuest }) => {
     img.src = "data:image/svg+xml;base64," + btoa(svgData);
   };
 
-  /* ================== BULK ZIP DOWNLOAD ================== */
+  /* ================= BULK ZIP DOWNLOAD ================= */
   const handleBulkDownload = async () => {
     if (guests.length === 0) return;
-
     if (!window.confirm(`Download QR codes for ${guests.length} guests?`))
       return;
 
@@ -106,8 +110,8 @@ const Registry: React.FC<RegistryProps> = ({ guests, onDeleteGuest }) => {
     try {
       const zip = new JSZip();
       const folder = zip.folder("Event_QRCodes");
-      let processed = 0;
 
+      let processed = 0;
       for (const guest of guests) {
         const dataUrl = await QRCode.toDataURL(String(guest.id), {
           width: 400,
@@ -126,29 +130,40 @@ const Registry: React.FC<RegistryProps> = ({ guests, onDeleteGuest }) => {
       link.href = URL.createObjectURL(content);
       link.download = "All_Event_QRs.zip";
       link.click();
-    } catch (e) {
-      console.error(e);
-      alert("ZIP generation failed");
+    } catch (err) {
+      console.error(err);
+      alert("Failed to generate ZIP");
     } finally {
       setIsZipping(false);
       setZipProgress(0);
     }
   };
 
-  /* ================== EMAIL BUTTON HANDLER ================== */
+  /* ================= EMAIL BUTTON ================= */
   const handleSendEmail = (guest: Guest) => {
     const qrImageUrl = `https://api.qrserver.com/v1/create-qr-code/?data=${guest.id}&size=200x200`;
 
-    sendToSheet(guest.name, guest.email, guest.id, qrImageUrl);
+    sendToSheet(
+      guest.name,
+      guest.email,
+      guest.id,
+      qrImageUrl
+    );
   };
 
-  /* ================== UI ================== */
+  /* ================= UI ================= */
   return (
     <div className="flex h-full relative">
       {/* LEFT PANEL */}
-      <div className={`flex-1 border-r ${selectedGuest ? "hidden md:flex" : "flex"} flex-col`}>
+      <div
+        className={`flex-1 border-r flex flex-col ${
+          selectedGuest ? "hidden md:flex" : "flex"
+        }`}
+      >
         <div className="p-4 border-b">
-          <h2 className="text-xl font-bold mb-3">Registry ({guests.length})</h2>
+          <h2 className="text-xl font-bold mb-3">
+            Registry ({guests.length})
+          </h2>
           <div className="relative">
             <Search className="absolute left-3 top-3 text-slate-400" size={18} />
             <input
@@ -161,16 +176,22 @@ const Registry: React.FC<RegistryProps> = ({ guests, onDeleteGuest }) => {
         </div>
 
         <div className="flex-1 overflow-y-auto">
-          {filteredGuests.map((guest) => (
-            <div
-              key={guest.id}
-              onClick={() => setSelectedGuest(guest)}
-              className="p-4 border-b cursor-pointer hover:bg-slate-50"
-            >
-              <p className="font-semibold">{guest.name}</p>
-              <p className="text-xs text-slate-500">{guest.email}</p>
+          {filteredGuests.length === 0 ? (
+            <div className="p-6 text-center text-slate-400">
+              No guests found
             </div>
-          ))}
+          ) : (
+            filteredGuests.map((guest) => (
+              <div
+                key={guest.id}
+                onClick={() => setSelectedGuest(guest)}
+                className="p-4 border-b cursor-pointer hover:bg-slate-50"
+              >
+                <p className="font-semibold">{guest.name}</p>
+                <p className="text-xs text-slate-500">{guest.email}</p>
+              </div>
+            ))
+          )}
         </div>
 
         <button
@@ -213,7 +234,9 @@ const Registry: React.FC<RegistryProps> = ({ guests, onDeleteGuest }) => {
 
             <div className="mt-6 space-y-3">
               <button
-                onClick={() => downloadQR(selectedGuest.id, selectedGuest.name)}
+                onClick={() =>
+                  downloadQR(selectedGuest.id, selectedGuest.name)
+                }
                 className="w-full bg-black text-white p-3 rounded flex justify-center gap-2"
               >
                 <Download /> Download QR
