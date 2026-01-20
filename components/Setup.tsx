@@ -1,6 +1,8 @@
 import React, { useState } from 'react';
-import { Upload, FileUp, AlertOctagon, UserPlus, Table, RefreshCw, HelpCircle, Check, XCircle, Download, Share2, Radio, Smartphone, Monitor } from 'lucide-react';
+import { Upload, FileUp, AlertOctagon, UserPlus, Table, RefreshCw, HelpCircle, Check, XCircle, Download, Radio, Smartphone, Monitor, Mail } from 'lucide-react';
 import { Guest, ScanLog, SyncMode } from '../types';
+import QRCode from 'qrcode';
+import JSZip from 'jszip';
 
 interface SetupProps {
   onAddGuest: (guest: Guest) => void;
@@ -17,20 +19,23 @@ interface SetupProps {
   onJoinSession: (code: string) => void;
 }
 
-const Setup: React.FC<SetupProps> = ({ 
-  onAddGuest, 
-  onBulkImport, 
-  onResetSystem, 
-  onMergeLogs, 
-  totalGuests, 
+const Setup: React.FC<SetupProps> = ({
+  onAddGuest,
+  onBulkImport,
+  onResetSystem,
+  onMergeLogs,
+  totalGuests,
   scanLogs,
+  guests,
   syncMode,
   sessionId,
   connectedPeers,
   onStartHosting,
   onJoinSession
 }) => {
-  const [formData, setFormData] = useState({ name: '', email: '', category: 'General', id: '', phone: '' });
+  const [formData, setFormData] = useState({ registrationNumber: '', name: '', gitamMailId: '', mobileNumber: '' });
+
+  const [manualRegData, setManualRegData] = useState({ registrationNumber: '', fullName: '', mobileNumber: '' });
   
   // Sync State
   const [joinCode, setJoinCode] = useState('');
@@ -89,20 +94,96 @@ const Setup: React.FC<SetupProps> = ({
 
   const handleManualAdd = (e: React.FormEvent) => {
     e.preventDefault();
-    if (formData.name && formData.email) {
+    if (formData.registrationNumber && formData.name && formData.gitamMailId) {
       const newGuest: Guest = {
-        id: formData.id || Math.random().toString(36).substr(2, 9).toUpperCase(),
+        id: formData.registrationNumber,
         name: formData.name,
-        email: formData.email,
-        phone: formData.phone,
-        category: formData.category,
+        email: formData.gitamMailId,
+        phone: formData.mobileNumber,
+        category: 'General',
         checkInDay1: null,
         checkInDay2: null
       };
       onAddGuest(newGuest);
-      setFormData({ name: '', email: '', category: 'General', id: '', phone: '' });
+      setFormData({ registrationNumber: '', name: '', gitamMailId: '', mobileNumber: '' });
       alert(`Added ${newGuest.name}`);
     }
+  };
+
+  const handleManualRegistration = (e: React.FormEvent) => {
+    e.preventDefault();
+    if (manualRegData.registrationNumber && manualRegData.fullName && manualRegData.mobileNumber) {
+      const newGuest: Guest = {
+        id: manualRegData.registrationNumber,
+        name: manualRegData.fullName,
+        phone: manualRegData.mobileNumber,
+        category: 'General',
+        checkInDay1: null,
+        checkInDay2: null
+      };
+      onAddGuest(newGuest);
+      setManualRegData({ registrationNumber: '', fullName: '', mobileNumber: '' });
+      alert(`Added ${newGuest.name}`);
+    }
+  };
+
+  const generateGuestEmail = async (guest: Guest) => {
+    const qrText = `Name: ${guest.name}\nEmail: ${guest.email || 'Not provided'}\nCategory: ${guest.category}\nID: ${guest.id}`;
+    const qrDataURL = await QRCode.toDataURL(qrText, { width: 256 });
+    const html = `<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Event Invitation - ${guest.name}</title>
+    <style>
+        body { font-family: Arial, sans-serif; margin: 0; padding: 20px; background-color: #f4f4f4; }
+        .container { max-width: 600px; margin: 0 auto; background-color: white; padding: 20px; border-radius: 8px; box-shadow: 0 0 10px rgba(0,0,0,0.1); }
+        h1 { color: #333; }
+        .qr-code { text-align: center; margin: 20px 0; }
+        .qr-code img { max-width: 100%; height: auto; }
+        .footer { margin-top: 20px; font-size: 12px; color: #666; }
+    </style>
+</head>
+<body>
+    <div class="container">
+        <h1>Event Invitation</h1>
+        <p>Dear ${guest.name},</p>
+        <p>You are invited to our event. Please present this QR code at check-in.</p>
+        <div class="qr-code">
+            <img src="${qrDataURL}" alt="QR Code for ${guest.id}" />
+        </div>
+        <p>Your Ticket ID: <strong>${guest.id}</strong></p>
+        <p>Category: ${guest.category}</p>
+        <div class="footer">
+            <p>This email contains your personal QR code. Do not share it.</p>
+        </div>
+    </div>
+</body>
+</html>`;
+    return html;
+  };
+
+  const handleGenerateEmails = async () => {
+    if (guests.length === 0) {
+      alert('No guests to generate emails for.');
+      return;
+    }
+    const zip = new JSZip();
+    for (const guest of guests) {
+      const html = await generateGuestEmail(guest);
+      const filename = `${guest.name.replace(/[^a-zA-Z0-9\s]/g, '').replace(/\s+/g, '_')}_${guest.id}.html`;
+      zip.file(filename, html);
+    }
+    const content = await zip.generateAsync({ type: 'blob' });
+    const url = URL.createObjectURL(content);
+    const link = document.createElement('a');
+    link.href = url;
+    link.download = `Guest_Emails_${new Date().toISOString().slice(0, 10)}.zip`;
+    document.body.appendChild(link);
+    link.click();
+    document.body.removeChild(link);
+    URL.revokeObjectURL(url);
   };
 
   const extractSheetId = (input: string) => {
@@ -219,42 +300,6 @@ const Setup: React.FC<SetupProps> = ({
     }
   };
 
-  // --- Sync Handlers ---
-
-  const handleExportSync = () => {
-    const dataStr = JSON.stringify(scanLogs, null, 2);
-    const blob = new Blob([dataStr], { type: "application/json" });
-    const url = URL.createObjectURL(blob);
-    const link = document.createElement('a');
-    link.href = url;
-    link.download = `EventGuard_SyncData_${new Date().toISOString().slice(0, 16).replace(/[:T]/g, '-')}.json`;
-    document.body.appendChild(link);
-    link.click();
-    document.body.removeChild(link);
-  };
-
-  const handleImportSync = (e: React.ChangeEvent<HTMLInputElement>) => {
-    const file = e.target.files?.[0];
-    if (!file) return;
-
-    const reader = new FileReader();
-    reader.onload = (evt) => {
-        try {
-            const json = JSON.parse(evt.target?.result as string);
-            if (Array.isArray(json)) {
-                onMergeLogs(json);
-                alert("Data merged successfully! Dashboard updated.");
-            } else {
-                alert("Invalid Sync File format.");
-            }
-        } catch (err) {
-            alert("Failed to parse Sync File.");
-        }
-    };
-    reader.readAsText(file);
-    // Reset value to allow re-uploading same file if needed
-    e.target.value = '';
-  };
 
   return (
     <div className="p-4 md:p-8 max-w-6xl mx-auto overflow-y-auto h-full">
@@ -341,30 +386,6 @@ const Setup: React.FC<SetupProps> = ({
           </label>
         </div>
 
-        {/* Manual Sync (Backup) */}
-        <div className="bg-white p-6 md:p-8 rounded-2xl shadow-sm border border-slate-100 flex flex-col">
-          <div className="flex items-center gap-2 mb-6">
-             <Share2 className="text-slate-500" />
-             <h3 className="font-bold text-lg text-slate-900">Manual Backup</h3>
-          </div>
-          <p className="text-sm text-slate-500 mb-6">
-            If Live Sync is unavailable due to network issues, use file export/import.
-          </p>
-          
-          <div className="space-y-4 mt-auto">
-             <button 
-                onClick={handleExportSync}
-                className="w-full flex items-center justify-center gap-2 bg-slate-50 text-slate-700 py-3 rounded-lg font-bold hover:bg-slate-100 transition-colors"
-             >
-                <Download size={18} /> Export File
-             </button>
-             
-             <label className="w-full flex items-center justify-center gap-2 bg-slate-800 text-white py-3 rounded-lg font-bold hover:bg-slate-900 transition-colors cursor-pointer">
-                <Upload size={18} /> Import File
-                <input type="file" accept=".json" className="hidden" onChange={handleImportSync} />
-             </label>
-          </div>
-        </div>
 
         {/* System Health */}
         <div className="bg-slate-900 text-white p-6 md:p-8 rounded-2xl shadow-lg flex flex-col">
@@ -450,6 +471,67 @@ const Setup: React.FC<SetupProps> = ({
             </div>
         )}
 
+      </div>
+
+      {/* Generate Guest Emails */}
+      <div className="mt-8 bg-white p-6 rounded-xl border border-slate-100">
+        <div className="flex items-center gap-3 mb-4">
+          <div className="w-10 h-10 bg-blue-50 rounded-lg flex items-center justify-center text-blue-600">
+            <Mail size={20} />
+          </div>
+          <div>
+            <h4 className="font-bold text-slate-900">Generate Guest Emails</h4>
+            <p className="text-xs text-slate-500">Create personalized HTML emails with embedded QR codes</p>
+          </div>
+        </div>
+        <button
+          onClick={handleGenerateEmails}
+          className="w-full bg-blue-600 text-white py-3 rounded-lg font-bold hover:bg-blue-700 transition-colors flex items-center justify-center gap-2"
+        >
+          <Download size={18} /> Download Emails as ZIP
+        </button>
+      </div>
+
+      {/* Manual Registrations */}
+      <div className="mt-8 bg-white p-6 rounded-xl border border-slate-100">
+        <h4 className="font-bold text-slate-900 mb-4">Manual Registrations</h4>
+        <form onSubmit={handleManualRegistration} className="space-y-4">
+          <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+            <div>
+              <label className="text-xs font-semibold text-slate-500 mb-1 block">Registration Number</label>
+              <input
+                type="text"
+                value={manualRegData.registrationNumber}
+                onChange={(e) => setManualRegData({...manualRegData, registrationNumber: e.target.value})}
+                className="w-full px-4 py-2 rounded-lg border border-slate-200 focus:border-blue-500 focus:ring-1 focus:ring-blue-500 outline-none"
+                required
+              />
+            </div>
+            <div>
+              <label className="text-xs font-semibold text-slate-500 mb-1 block">Full Name</label>
+              <input
+                type="text"
+                value={manualRegData.fullName}
+                onChange={(e) => setManualRegData({...manualRegData, fullName: e.target.value})}
+                className="w-full px-4 py-2 rounded-lg border border-slate-200 focus:border-blue-500 focus:ring-1 focus:ring-blue-500 outline-none"
+                required
+              />
+            </div>
+            <div>
+              <label className="text-xs font-semibold text-slate-500 mb-1 block">Mobile Number</label>
+              <input
+                type="tel"
+                value={manualRegData.mobileNumber}
+                onChange={(e) => setManualRegData({...manualRegData, mobileNumber: e.target.value})}
+                className="w-full px-4 py-2 rounded-lg border border-slate-200 focus:border-blue-500 focus:ring-1 focus:ring-blue-500 outline-none"
+                required
+              />
+            </div>
+          </div>
+          <button type="submit" className="w-full bg-blue-600 text-white py-3 rounded-lg font-bold hover:bg-blue-700 transition-colors flex items-center justify-center gap-2">
+            Enter
+          </button>
+        </form>
       </div>
     </div>
   );

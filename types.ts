@@ -1,7 +1,7 @@
 export interface Guest {
   id: string;
   name: string;
-  email: string;
+  email?: string;
   phone?: string;
   category: string; // e.g., General, VIP, Staff
   checkInDay1: string | null; // ISO Date string or null

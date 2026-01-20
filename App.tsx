@@ -349,13 +349,14 @@ const App: React.FC = () => {
           />
         )}
         {currentView === 'SETUP' && (
-          <Setup 
+          <Setup
             onAddGuest={handleAddGuest}
             onBulkImport={handleBulkImport}
             onResetSystem={handleReset}
             onMergeLogs={handleMergeLogs}
             totalGuests={guests.length}
             scanLogs={scanLogs}
+            guests={guests}
             // Sync Props
             syncMode={syncMode}
             sessionId={sessionId}
