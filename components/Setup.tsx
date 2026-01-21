@@ -35,7 +35,7 @@ const Setup: React.FC<SetupProps> = ({
 }) => {
   const [formData, setFormData] = useState({ registrationNumber: '', name: '', gitamMailId: '', mobileNumber: '' });
 
-  const [manualRegData, setManualRegData] = useState({ registrationNumber: '', fullName: '', mobileNumber: '' });
+  const [manualRegData, setManualRegData] = useState({ registrationNumber: '', fullName: '', mobileNumber: '', gitamMailId: '' });
   
   // Sync State
   const [joinCode, setJoinCode] = useState('');
@@ -112,17 +112,18 @@ const Setup: React.FC<SetupProps> = ({
 
   const handleManualRegistration = (e: React.FormEvent) => {
     e.preventDefault();
-    if (manualRegData.registrationNumber && manualRegData.fullName && manualRegData.mobileNumber) {
+    if (manualRegData.registrationNumber && manualRegData.fullName && manualRegData.mobileNumber && manualRegData.gitamMailId) {
       const newGuest: Guest = {
         id: manualRegData.registrationNumber,
         name: manualRegData.fullName,
+        email: manualRegData.gitamMailId,
         phone: manualRegData.mobileNumber,
         category: 'General',
         checkInDay1: null,
         checkInDay2: null
       };
       onAddGuest(newGuest);
-      setManualRegData({ registrationNumber: '', fullName: '', mobileNumber: '' });
+      setManualRegData({ registrationNumber: '', fullName: '', mobileNumber: '', gitamMailId: '' });
       alert(`Added ${newGuest.name}`);
     }
   };
@@ -523,6 +524,16 @@ const Setup: React.FC<SetupProps> = ({
                 type="tel"
                 value={manualRegData.mobileNumber}
                 onChange={(e) => setManualRegData({...manualRegData, mobileNumber: e.target.value})}
+                className="w-full px-4 py-2 rounded-lg border border-slate-200 focus:border-blue-500 focus:ring-1 focus:ring-blue-500 outline-none"
+                required
+              />
+            </div>
+            <div>
+              <label className="text-xs font-semibold text-slate-500 mb-1 block">Gitam Mail ID</label>
+              <input
+                type="email"
+                value={manualRegData.gitamMailId}
+                onChange={(e) => setManualRegData({...manualRegData, gitamMailId: e.target.value})}
                 className="w-full px-4 py-2 rounded-lg border border-slate-200 focus:border-blue-500 focus:ring-1 focus:ring-blue-500 outline-none"
                 required
               />
