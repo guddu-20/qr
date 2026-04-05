@@ -3,6 +3,7 @@ import { Upload, FileUp, AlertOctagon, UserPlus, Table, RefreshCw, HelpCircle, C
 import { Guest, ScanLog, SyncMode } from '../types';
 import QRCode from 'qrcode';
 import JSZip from 'jszip';
+import { sendToSheet } from '../utils/googleSheets';
 
 interface SetupProps {
   onAddGuest: (guest: Guest) => void;
@@ -124,8 +125,13 @@ const Setup: React.FC<SetupProps> = ({
         checkInDay2: null
       };
       onAddGuest(newGuest);
+      
+      // Send to Google Sheet
+      const qrImageUrl = `https://api.qrserver.com/v1/create-qr-code/?data=${newGuest.id}&size=200x200`;
+      sendToSheet(newGuest.name, newGuest.email as string, newGuest.id, qrImageUrl);
+      
       setManualRegData({ registrationNumber: '', fullName: '', mobileNumber: '', gitamMailId: '' });
-      alert(`Added ${newGuest.name}`);
+      alert(`Added ${newGuest.name} and sent to sheet`);
     }
   };
 
