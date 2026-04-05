@@ -86,24 +86,49 @@ const App: React.FC = () => {
   };
 
   const handleJoinSession = (code: string) => {
+    if (!code || code.length !== 6) {
+      alert('Please enter a valid 6-digit session code');
+      return;
+    }
+
     const newPeer = new Peer(); // Client gets random ID
     
     newPeer.on('open', () => {
         const conn = newPeer.connect(`eventguard-${code}`);
         
+        // Add timeout for connection (5 seconds)
+        const connectionTimeout = setTimeout(() => {
+            conn.close();
+            alert('Connection timeout. Host may be offline or code is incorrect.');
+            setSyncMode('ALONE');
+        }, 5000);
+        
         conn.on('open', () => {
+            clearTimeout(connectionTimeout);
             setSessionId(code);
             setSyncMode('CLIENT');
             setConnections([conn]);
+            console.log('Successfully joined session:', code);
         });
 
         conn.on('data', (data: any) => handleSyncMessage(data, 'HOST'));
         
         conn.on('error', (err) => {
+            clearTimeout(connectionTimeout);
             console.error('Connection Error:', err);
-            alert('Could not connect to host. Check code and internet.');
+            alert(`Could not connect to host: ${err.type}. Please check the code and internet.`);
             setSyncMode('ALONE');
         });
+        
+        conn.on('close', () => {
+            clearTimeout(connectionTimeout);
+        });
+    });
+
+    newPeer.on('error', (err) => {
+        console.error('Peer Error:', err);
+        alert(`Session error: ${err.type}. Please try again.`);
+        setSyncMode('ALONE');
     });
 
     setPeer(newPeer);

@@ -11,6 +11,7 @@ interface SetupProps {
   onMergeLogs: (logs: ScanLog[]) => void;
   totalGuests: number;
   scanLogs: ScanLog[];
+  guests: Guest[];
   // Live Sync Props
   syncMode: SyncMode;
   sessionId: string;
@@ -332,16 +333,24 @@ const Setup: React.FC<SetupProps> = ({
                   <div className="flex gap-2">
                       <input 
                         type="text" 
-                        placeholder="Session Code" 
+                        placeholder="Session Code (6 digits)" 
                         value={joinCode}
                         onChange={(e) => setJoinCode(e.target.value.replace(/[^0-9]/g, ''))}
                         className="flex-1 px-4 py-3 rounded-lg border border-slate-200 outline-none text-slate-900 text-center font-mono font-bold tracking-widest placeholder:tracking-normal placeholder:font-sans"
                         maxLength={6}
                       />
                       <button 
-                        onClick={() => onJoinSession(joinCode)}
+                        onClick={() => {
+                          if (joinCode.length === 6) {
+                            onJoinSession(joinCode);
+                          }
+                        }}
                         disabled={joinCode.length < 6}
-                        className="px-6 bg-slate-900 text-white rounded-lg font-bold hover:bg-black transition-colors disabled:opacity-50"
+                        className={`px-6 rounded-lg font-bold transition-all ${
+                          joinCode.length < 6 
+                            ? 'bg-slate-300 text-slate-500 cursor-not-allowed opacity-50' 
+                            : 'bg-slate-900 text-white hover:bg-black cursor-pointer'
+                        }`}
                       >
                           Join
                       </button>

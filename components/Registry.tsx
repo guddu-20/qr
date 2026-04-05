@@ -66,9 +66,10 @@ const Registry: React.FC<RegistryProps> = ({ guests, onDeleteGuest }) => {
   /* ================= UNIQUE GUESTS ================= */
   const uniqueGuests = useMemo(() => {
     const seen = new Set<string>();
-    return guests.filter(guest => {
-      if (seen.has(guest.email)) return false;
-      seen.add(guest.email);
+    return guests.filter((guest: Guest) => {
+      const email = guest.email || '';
+      if (seen.has(email)) return false;
+      seen.add(email);
       return true;
     });
   }, [guests]);
@@ -77,9 +78,9 @@ const Registry: React.FC<RegistryProps> = ({ guests, onDeleteGuest }) => {
   const filteredGuests = useMemo(() => {
     const lower = searchTerm.toLowerCase();
     return uniqueGuests.filter(
-      (g) =>
+      (g: Guest) =>
         g.name.toLowerCase().includes(lower) ||
-        g.email.toLowerCase().includes(lower) ||
+        (g.email && g.email.toLowerCase().includes(lower)) ||
         String(g.id).includes(lower)
     );
   }, [uniqueGuests, searchTerm]);
@@ -152,6 +153,10 @@ const Registry: React.FC<RegistryProps> = ({ guests, onDeleteGuest }) => {
 
   /* ================= EMAIL BUTTON ================= */
   const handleSendEmail = (guest: Guest) => {
+    if (!guest.email) {
+      alert('Email address is required to send email.');
+      return;
+    }
     const qrImageUrl = `https://api.qrserver.com/v1/create-qr-code/?data=${guest.id}&size=200x200`;
 
     sendToSheet(
@@ -165,14 +170,21 @@ const Registry: React.FC<RegistryProps> = ({ guests, onDeleteGuest }) => {
   /* ================= SEND EMAILS TO ALL ================= */
   const handleSendEmailsToAll = async () => {
     if (uniqueGuests.length === 0) return;
-    if (!window.confirm(`Send emails to ${uniqueGuests.length} guests?`)) return;
+    
+    const guestsWithEmail = uniqueGuests.filter(guest => guest.email);
+    if (guestsWithEmail.length === 0) {
+      alert('No guests with email addresses found.');
+      return;
+    }
+    
+    if (!window.confirm(`Send emails to ${guestsWithEmail.length} guests?`)) return;
 
     setIsSendingEmails(true);
 
     try {
-      for (const guest of uniqueGuests) {
+      for (const guest of guestsWithEmail) {
         const qrImageUrl = `https://api.qrserver.com/v1/create-qr-code/?data=${guest.id}&size=200x200`;
-        sendToSheet(guest.name, guest.email, guest.id, qrImageUrl);
+        sendToSheet(guest.name, guest.email as string, guest.id, qrImageUrl);
         // Small delay to avoid overwhelming the server
         await new Promise(resolve => setTimeout(resolve, 100));
       }
@@ -202,7 +214,7 @@ const Registry: React.FC<RegistryProps> = ({ guests, onDeleteGuest }) => {
             <Search className="absolute left-3 top-3 text-slate-400" size={18} />
             <input
               value={searchTerm}
-              onChange={(e) => setSearchTerm(e.target.value)}
+              onChange={(e: React.ChangeEvent<HTMLInputElement>) => setSearchTerm(e.target.value)}
               placeholder="Search..."
               className="w-full pl-10 pr-3 py-2 border rounded"
             />
@@ -215,7 +227,7 @@ const Registry: React.FC<RegistryProps> = ({ guests, onDeleteGuest }) => {
               No guests found
             </div>
           ) : (
-            filteredGuests.map((guest) => (
+            filteredGuests.map((guest: Guest) => (
               <div
                 key={guest.id}
                 onClick={() => setSelectedGuest(guest)}
